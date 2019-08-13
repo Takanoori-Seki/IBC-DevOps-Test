@@ -1,0 +1,7 @@
+sag3:
+  build: .
+  dockerfile: dockerfile-sag3-el6
+  volumes:
+    - ~/package:/package
+  privileged: true
+  net: "bridge" 
