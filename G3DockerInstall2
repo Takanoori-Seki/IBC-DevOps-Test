@@ -1,0 +1,72 @@
+FROM centos:6
+MAINTAINER IBC
+
+RUN mkdir /package
+VOLUME /package
+
+RUN yum -y update
+RUN yum -y install openssh-clients wget yum-utils
+RUN wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+RUN wget http://repository.it4i.cz/mirrors/repoforge/redhat/el6/en/x86_64/rpmforge/RPMS/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
+RUN rpm -ivh epel-release-latest-6.noarch.rpm rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
+RUN rm -f epel-release-latest-6.noarch.rpm rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
+RUN yum -y install net-snmp net-snmp-utils postgresql libpcap libev bind-utils
+RUN yum --enablerepo=rpmforge-extras -y install rrdtool
+
+RUN echo 'ZONE="Asia/Tokyo"' > /etc/sysconfig/clock 
+RUN rm -f /etc/localtime
+RUN ln -fs /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+
+RUN touch /tmp/sag3-install
+RUN echo "#!/bin/bash -x" > /tmp/sag3-install
+RUN echo "rpm -qa | grep SystemAnswerG3 && exit 0" >> /tmp/sag3-install
+RUN echo "yum -y install ipa-pgothic-fonts" >> /tmp/sag3-install
+RUN echo "localedef -f UTF-8 -i ja_JP ja_JP.utf8" >> /tmp/sag3-install
+RUN echo "rpm -ivh /package/SystemAnswerG3*.el6.x86_64.rpm" >> /tmp/sag3-install
+RUN echo "/sa/scripts/engine_setup.pl" >> /tmp/sag3-install
+RUN echo "yumdownloader perl-Digest-MD5" >> /tmp/sag3-install
+RUN echo "rpm -ivh --force perl-Digest-1.17-245.el7.noarch.rpm" >> /tmp/sag3-install
+RUN echo "rpm -ivh --force \`ls perl-Digest*\`" >> /tmp/sag3-install
+RUN echo "rm -f perl-Digest-MD5*" >> /tmp/sag3-install
+RUN echo "/sa/scripts/database_setup.pl" >> /tmp/sag3-install
+RUN echo "/sa/scripts/web_setup.pl" >> /tmp/sag3-install
+RUN echo "/sa/scripts/rrd_setup.pl" >> /tmp/sag3-install
+RUN echo "service samond start" >> /tmp/sag3-install
+RUN echo "service sanoded start" >> /tmp/sag3-install
+RUN echo "service sarecoveryd start" >> /tmp/sag3-install
+RUN echo "service samaintenanced start" >> /tmp/sag3-install
+RUN echo "service salicensed start" >> /tmp/sag3-install
+RUN echo "service rrdcached start" >> /tmp/sag3-install
+RUN echo "service rrdresized start" >> /tmp/sag3-install
+RUN echo "service rrdcalcd start" >> /tmp/sag3-install
+RUN echo "service httpd restart" >> /tmp/sag3-install
+
+RUN echo "yum -y install syslog-ng syslog-ng-libdbi libdbi-dbd-pgsql" >> /tmp/sag3-install
+RUN echo "mv /etc/syslog-ng/syslog-ng.conf /etc/syslog-ng/syslog-ng.conf.org" >> /tmp/sag3-install
+RUN echo "cp -p /sa/etc/syslog-ng.conf.el6.sample /etc/syslog-ng/syslog-ng.conf" >> /tmp/sag3-install
+RUN echo "cp -p /sa/etc/syslog2db.conf.sample /sa/etc/syslog2db.conf" >> /tmp/sag3-install
+RUN echo "service syslog-ng restart" >> /tmp/sag3-install
+RUN echo "chkconfig syslog-ng on" >> /tmp/sag3-install
+
+RUN echo "mv /etc/sysconfig/snmptrapd /etc/sysconfig/snmptrapd.org" >> /tmp/sag3-install
+RUN echo "mv /etc/snmp/snmptrapd.conf /etc/snmp/snmptrapd.conf.org" >> /tmp/sag3-install
+RUN echo "cp -p /sa/etc/sysconfig_snmptrapd.sample /etc/sysconfig/snmptrapd" >> /tmp/sag3-install
+RUN echo "cp -p /sa/etc/snmptrapd.conf.sample /etc/snmp/snmptrapd.conf" >> /tmp/sag3-install
+RUN echo "echo 'com2sec public  0.0.0.0/0 public' >> /etc/snmp/snmptrapd.conf" >> /tmp/sag3-install
+RUN echo "service snmptrapd restart" >> /tmp/sag3-install
+RUN echo "chkconfig snmptrapd on" >> /tmp/sag3-install
+
+RUN echo "yum -y install sendmail" >> /tmp/sag3-install
+RUN echo "yum -y install postfix" >> /tmp/sag3-install
+RUN echo "yum -y install mailx" >> /tmp/sag3-install
+RUN echo "yum -y remove ssmtp" >> /tmp/sag3-install
+RUN echo "sed -ie 's/^mydestination/#mydestination/g' /etc/postfix/main.cf" >> /tmp/sag3-install
+RUN echo "sed -ie 's/^inet_interfaces = localhost/inet_interfaces = 127.0.0.1/g' /etc/postfix/main.cf" >> /tmp/sag3-install
+RUN echo "echo 'mynetworks = 127.0.0.1/8' >> /etc/postfix/main.cf" >> /tmp/sag3-install
+RUN echo "newaliases" >> /tmp/sag3-install
+RUN echo "service postfix restart" >> /tmp/sag3-install
+RUN echo "chkconfig postfix on" >> /tmp/sag3-install
+
+RUN chmod a+x /tmp/sag3-install
+
+CMD ["/sbin/init"]
